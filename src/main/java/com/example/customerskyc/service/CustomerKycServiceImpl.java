@@ -19,22 +19,17 @@ import com.itextpdf.text.pdf.PdfWriter;
 
 import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
 
-import org.springframework.beans.factory.annotation.Autowired;
-
 import org.springframework.stereotype.Service;
 import com.itextpdf.text.Document;
 
 
 import javax.activation.DataHandler;
-import javax.activation.DataSource;
-import javax.activation.FileDataSource;
 import javax.mail.*;
 import javax.mail.internet.*;
 import javax.mail.util.ByteArrayDataSource;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 
 import static org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER;
@@ -48,7 +43,7 @@ public class CustomerKycServiceImpl implements CustomerKycService {
 
     private final CustomerKycRepository customerKycRepository;
 
-
+    private final String senderEmail="sseun976@gmail.com";
 
     @Override
     public CustomerKycResponse createCustomersKyc(CustomerKycRequest customerKycRequest) {
@@ -148,78 +143,69 @@ public class CustomerKycServiceImpl implements CustomerKycService {
             throw new RuntimeException(e);
         }
     }
-    @Override
-    public void sendCustomerKycByEmail(String recipientEmail) {
 
-        ByteArrayInputStream excelStream = downloadCustomerKycFromExcelSheetForm();
+    private Session initializeSession() {
+        String port = "465";
 
-
-        ByteArrayInputStream pdfStream = downloadCustomerKycAsPdf();
-        String senderEmail = "sseun976@gmail.com";
-        String senderPassword = "zeus12345";
-
-        String port="465";
+        String senderPassword= "vebl qlhg apix fmbd";
 
         Properties properties = new Properties();
-
         properties.put("mail.smtp.auth", "true");
-        properties.put("mail.smtp.user",senderEmail);
+        properties.put("mail.smtp.user", senderEmail);
         properties.put("mail.smtp.starttls.enable", "true");
         properties.put("mail.smtp.host", "smtp.gmail.com");
         properties.put("mail.smtp.port", port);
         properties.put("mail.smtp.socketFactory.port", port);
         properties.put("mail.smtp.ssl.protocols", "TLSv1.2");
-
         properties.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
 
-
-
-        Session session = Session.getDefaultInstance(properties,
-                new javax.mail.Authenticator()  {
+     Session   session = Session.getDefaultInstance(properties, new javax.mail.Authenticator() {
             @Override
             protected PasswordAuthentication getPasswordAuthentication() {
                 return new PasswordAuthentication(senderEmail, senderPassword);
             }
         });
         session.setDebug(true);
+        return session;
+    }
+    @Override
+    public void sendCustomerKycByEmail(String recipientEmail) {
+        ByteArrayInputStream excelStream = downloadCustomerKycFromExcelSheetForm();
+        ByteArrayInputStream pdfStream = downloadCustomerKycAsPdf();
 
         try {
-
-            MimeMessage message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(senderEmail));
-            message.setRecipient(Message.RecipientType.TO, new InternetAddress(recipientEmail));
-            message.setSubject("Customer KYC Data");
-            message.setText("Please find attached the Customer KYC data in Excel and PDF formats.");
-
-
-            Multipart multipart = new MimeMultipart();
-
-
-            MimeBodyPart excelAttachment = new MimeBodyPart();
-            excelAttachment.setDataHandler(new DataHandler(new ByteArrayDataSource(excelStream, "application/vnd.ms-excel")));
-            excelAttachment.setFileName("customer_kyc.xls");
-            multipart.addBodyPart(excelAttachment);
-
-
-
-            MimeBodyPart pdfAttachment = new MimeBodyPart();
-            pdfAttachment.setDataHandler(new DataHandler(new ByteArrayDataSource(pdfStream, "application/pdf")));
-            pdfAttachment.setFileName("customer_kyc.pdf");
-            multipart.addBodyPart(pdfAttachment);
-
-
-            message.setContent(multipart);
-
-
-            Transport transport = session.getTransport("smtp");
-            transport.connect( "smtp.gmail.com" ,Integer.valueOf(port),senderEmail, senderPassword);
-            transport.sendMessage(message, message.getAllRecipients());
-            transport.close();
+            MimeMessage message = createMessage(recipientEmail);
+            addAttachmentsToMessage(message, excelStream, pdfStream);
+            Transport.send(message);
         } catch (MessagingException e) {
             throw new RuntimeException("Failed to send email", e);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+    private MimeMessage createMessage(String recipientEmail) throws MessagingException {
+        Session session=initializeSession();
+        MimeMessage message = new MimeMessage(session);
+        message.setFrom(new InternetAddress(senderEmail));
+        message.setRecipient(Message.RecipientType.TO, new InternetAddress(recipientEmail));
+        message.setSubject("Customer KYC Data");
+        message.setText("Please find attached the Customer KYC data in Excel and PDF formats.");
+        return message;
+    }
+    private void addAttachmentsToMessage(MimeMessage message, ByteArrayInputStream excelStream, ByteArrayInputStream pdfStream) throws MessagingException, IOException {
+        Multipart multipart = new MimeMultipart();
+
+        MimeBodyPart excelAttachment = new MimeBodyPart();
+        excelAttachment.setDataHandler(new DataHandler(new ByteArrayDataSource(excelStream, "application/vnd.ms-excel")));
+        excelAttachment.setFileName("customer_kyc.xls");
+        multipart.addBodyPart(excelAttachment);
+
+        MimeBodyPart pdfAttachment = new MimeBodyPart();
+        pdfAttachment.setDataHandler(new DataHandler(new ByteArrayDataSource(pdfStream, "application/pdf")));
+        pdfAttachment.setFileName("customer_kyc.pdf");
+        multipart.addBodyPart(pdfAttachment);
+
+        message.setContent(multipart);
     }
 }
 
