@@ -6,21 +6,21 @@ import com.example.customerskyc.model.CustomerKyc;
 import com.example.customerskyc.repository.CustomerKycRepository;
 
 
+import com.itextpdf.text.*;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.lowagie.text.Phrase;
+import com.lowagie.text.pdf.PdfPCell;
 import lombok.AllArgsConstructor;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.usermodel.Font;
 
-import com.itextpdf.text.DocumentException;
-
-import com.itextpdf.text.Paragraph;
 import com.itextpdf.text.pdf.PdfWriter;
 
 
 import org.apache.tomcat.util.http.fileupload.ByteArrayOutputStream;
 
 import org.springframework.stereotype.Service;
-import com.itextpdf.text.Document;
 
 
 import javax.activation.DataHandler;
@@ -29,9 +29,13 @@ import javax.mail.internet.*;
 import javax.mail.util.ByteArrayDataSource;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Stream;
 
+
+import static org.apache.poi.ss.usermodel.Color.*;
 import static org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER;
 import static org.apache.poi.ss.usermodel.Row.MissingCellPolicy.CREATE_NULL_AS_BLANK;
 
@@ -43,7 +47,7 @@ public class CustomerKycServiceImpl implements CustomerKycService {
 
     private final CustomerKycRepository customerKycRepository;
 
-    private final String senderEmail="sseun976@gmail.com";
+    private final String senderEmail = "sseun976@gmail.com";
 
     @Override
     public CustomerKycResponse createCustomersKyc(CustomerKycRequest customerKycRequest) {
@@ -60,10 +64,9 @@ public class CustomerKycServiceImpl implements CustomerKycService {
         customerResponse.setFullName(customer.getFullName());
 
         customerKycRepository.save(customer);
-        System.out.println(" customer created;"+ customer);
+        System.out.println(" customer created;" + customer);
         return customerResponse;
     }
-
 
 
     @Override
@@ -72,7 +75,7 @@ public class CustomerKycServiceImpl implements CustomerKycService {
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet();
             var customerKyc = customerKycRepository.findAll();
-            String[] headers = {"id", "full name", "phoneNumber",  "contactAddress","email"};
+            String[] headers = {"id", "full name", "phoneNumber", "contactAddress", "email"};
             createHeader(headers, sheet, workbook);
             writeValuesToExcelForCustomerKyc(sheet, customerKyc);
             workbook.write(outputStream);
@@ -126,16 +129,22 @@ public class CustomerKycServiceImpl implements CustomerKycService {
             document.open();
 
             List<CustomerKyc> customerKycList = customerKycRepository.findAll();
+
+            PdfPTable table = new PdfPTable(5);
+            table.setWidthPercentage(100);
+            table.setSpacingBefore(10);
+
+
+            addTableHeader(table);
+
+
+
             for (CustomerKyc customer : customerKycList) {
-                Paragraph paragraph = new Paragraph();
-                paragraph.add("ID: " + customer.getId());
-                paragraph.add("\nFull Name: " + customer.getFullName());
-                paragraph.add("\nEmail: " + customer.getEmail());
-                paragraph.add("\nPhone Number: " + customer.getPhoneNumber());
-                paragraph.add("\nContact Address: " + customer.getContactAddress());
-                paragraph.add("\n\n");
-                document.add(paragraph);
+                String [] customerKycDetail={String.valueOf(customer.getId()), customer.getFullName(), customer.getEmail(), customer.getPhoneNumber(), customer.getContactAddress()};
+                addTableRow(table,customerKycDetail );
             }
+
+            document.add(table);
 
             document.close();
             return new ByteArrayInputStream(outputStream.toByteArray());
@@ -144,6 +153,27 @@ public class CustomerKycServiceImpl implements CustomerKycService {
         }
     }
 
+    private void addTableHeader(PdfPTable table) {
+        String[] header = {"ID", "Full Name", "Email", "Phone Number", "Contact Address"};
+        for (String collect : header) {
+            PdfPCell headerCell = new PdfPCell();
+            headerCell.setBackgroundColor(java.awt.Color.GRAY);
+            headerCell.setPhrase(new Phrase(collect));
+
+            table.addCell(collect);
+            
+        }
+
+    }
+
+
+
+
+    private void addTableRow(PdfPTable table, String[] cellValues) {
+        for (String customerKyc : cellValues) {
+            table.addCell(customerKyc);
+        }
+    }
     private Session initializeSession() {
         String port = "465";
 
